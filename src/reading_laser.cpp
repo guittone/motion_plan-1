@@ -4,34 +4,37 @@
 #include <string>
 #include "sensor_msgs/LaserScan.h"
 #include <iomanip>
-/*
-funzione per il calcolo del minimo in un array 
-Parametri: a[] array di float , n1 indice 1, n2 indice 2
 
-float calcola_minimo(const std::vector<float> a,int n1,int n2)
+//Divisione dei 180 gradi con 720 letture in 6 regioni uguali
+//Calcolo del minimo per ogni regione
+//funzione per il calcolo del minimo in un array 
+//Parametri: a[] array di float , n1 indice 1, n2 indice 2
+
+float calcola_minimo(const sensor_msgs::LaserScan::ConstPtr& msg,int n1,int n2)
 {
     int i;
-    float minimo = a[n1];
-    for(i=n1+1;i<=n2;i++)
-        if(a[i]<minimo)
-            minimo = a[i];
+    float minimo = msg->ranges[n1];
+    for(i=n1+1 ; i<n2 ; i++)
+        if(msg->ranges[i] < minimo)
+            minimo = msg->ranges[i];
+    if(minimo > 10)
+        minimo = 10;
     return minimo;
 
 }
-*/
+
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
+	int k;
+	float min_regions[6] = {0};
+	//calculates the minimum for each of the 6 regions
+	for(k = 0; k < 6; k++)
+		min_regions[k] = calcola_minimo(msg, k*120, (k+1)*120);
+	
 
-    //Divisione dei 180 gradi con 720 letture in 6 regioni uguali
-    //Calcolo del minimo per ogni regione
-    float min_set1=0;
-    float min_set2=0;
-    float min_set3=0;
-    float min_set4=0;
-    float min_set5=0;
-    float min_set6=0;
-    int i;
-    
+
+
+       /* 
     min_set1 = msg->ranges[0];
     for(i=0;i<120;i++)
     {
@@ -111,8 +114,10 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     }
     Ricordare in questo caso di usare s.c_str() nella ROS_INFO per converitre la stringa in stringa c
     */
-   ROS_INFO("\n[Angolo minimo: %f]\n[Angolo massimo: %f]\n[Passo: %f]\n[Intrevallo temporale tra le misure: %f]\n[Tempo tra le scansioni: %f]\n[Range massimo: %f]\n[Range minimo: %f]\n[%f] [%f] [%f] [%f] [%f] [%f]",msg->angle_min,msg->angle_max, msg->angle_increment,msg->time_increment,msg->scan_time,msg->range_max,msg->range_min,min_set1,min_set2,min_set3,min_set4,min_set5,min_set6);
+   ROS_INFO("\n[Angolo minimo: %f]\n[Angolo massimo: %f]\n[Passo: %f]\n[Intrevallo temporale tra le misure: %f]\n[Tempo tra le scansioni: %f]\n[Range massimo: %f]\n[Range minimo: %f]\n[%f] [%f] [%f] [%f] [%f] [%f]",msg->angle_min,msg->angle_max, msg->angle_increment,msg->time_increment,msg->scan_time,msg->range_max,msg->range_min,min_regions[0],min_regions[1],min_regions[2],min_regions[3],min_regions[4],min_regions[5]);
 }
+
+
 
 int main(int argc, char **argv)
 {
