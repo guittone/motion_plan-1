@@ -1,3 +1,4 @@
+
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include <sstream>
@@ -11,21 +12,29 @@ void take_action(float regions[], float sft_dist);
 void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
 
 
+
+
 //GLOBAL VARIABLES//
 /* sft_dist  (float wich rapresent the safety distance below wich we would like to
     stay from an obstacle)
 */
 float sft_dist_ = 1.0;
 
+/*
+	Defining the publisher we're going to use as a global variable
+	is necessary to make it visible to the function inside wich it
+	will publish
+*/
+ros::Publisher motion_pub = {};
 
 
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "reading_laser");
-    ros::NodeHandle n;
-    ros::Subscriber sub = n.subscribe("/m2wr/laser/scan", 1000, laserCallback);
-    ros::Publisher motion_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
+    ros::NodeHandle nh;
+    ros::Subscriber sub = nh.subscribe("/m2wr/laser/scan", 1000, laserCallback);
+    ::motion_pub = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
     ros::spin();
     return 0;
 }
@@ -57,7 +66,7 @@ float calcola_minimo(const sensor_msgs::LaserScan::ConstPtr& msg,int n1,int n2)
     Parameters: -regions[] (float array that contain minimum distances from obstacles situated
                             in the 6 regions of the laser_ranges)
 */
-void take_action(float regions[])
+void take_action(float regions[],float sft_dist)
 {
 	
 	geometry_msgs::Twist msg;
@@ -186,8 +195,7 @@ void take_action(float regions[])
 	msg.angular.z = angular_z;
     //Publishing the message msg
 	motion_pub.publish(msg);
-	ros::spinOnce();
-}
+	}
 
 
 //This function is called every time the reading_lase node read a new message from the /m2wr/laser/scan topic
@@ -200,6 +208,6 @@ void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 		min_regions[k] = calcola_minimo(msg, k*120, (k+1)*120);
 //Chiamata della funzione  take_action che si occuperà di pubblicare i messaggi sul /cmd_vel topic
 //ed informarci in che caso ricadiamo
-    take_action(min_regions);
+    take_action(min_regions, sft_dist_);
     
 }

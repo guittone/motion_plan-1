@@ -153,8 +153,11 @@ include_directories(
 # )
 
 add_executable(reading_laser src/reading_laser.cpp)
+add_executable(obstacle_avoidance src/obstacle_avoidance.cpp)
 target_link_libraries(reading_laser ${catkin_LIBRARIES})
+target_link_libraries(obstacle_avoidance ${catkin_LIBRARIES})
 add_dependencies(reading_laser motion_plan_generate_messages_cpp)
+add_dependencies(obstacle_avoidance motion_plan_generate_messages_cpp)
 
 #############
 ## Install ##
