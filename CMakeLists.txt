@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  tf
+  nav_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,7 +109,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES motion_plan
-  CATKIN_DEPENDS geometry_msgs roscpp rospy sensor_msgs std_msgs
+  CATKIN_DEPENDS geometry_msgs roscpp rospy sensor_msgs std_msgs nav_msgs
   DEPENDS system_lib
 )
 
@@ -154,11 +156,13 @@ include_directories(
 
 add_executable(reading_laser src/reading_laser.cpp)
 add_executable(obstacle_avoidance src/obstacle_avoidance.cpp)
+add_executable(go_to_point src/go_to_point.cpp)
 target_link_libraries(reading_laser ${catkin_LIBRARIES})
 target_link_libraries(obstacle_avoidance ${catkin_LIBRARIES})
+target_link_libraries(go_to_point ${catkin_LIBRARIES})
 add_dependencies(reading_laser motion_plan_generate_messages_cpp)
 add_dependencies(obstacle_avoidance motion_plan_generate_messages_cpp)
-
+add_dependencies(go_to_point motion_plan_generate_messages_cpp)
 #############
 ## Install ##
 #############
