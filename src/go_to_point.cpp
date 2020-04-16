@@ -193,12 +193,14 @@ bool robot_moving(const ROBOT_STATE move_type)
     else if (move_type == TURN_LEFT)
     {
         ROS_INFO("Turning left! \n");
+        motion_command.linear.x = 0.0;
         motion_comand.angular.z = take_action_angular_speed;
     }
     else if (move_type == FOLLOW_WALL)
     {
         ROS_INFO("Avoiding the wall! \n");
          motion_command.linear.x = take_action_linear_speed;
+          motion_comand.angular.z = 0.0;
     }
     motion_pub.publish(motion_command);
     return true;   
