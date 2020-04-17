@@ -24,13 +24,16 @@ geometry_msgs::Point position;
 double roll;
 double pitch;
 double yaw;
+//Errore di posizione
+double pos_err = 1000; //Inizializzata a valore casuale, per evitare che sia automaticamente inizializzata a 0
 //Posizione d'arrivo
 geometry_msgs::Point desired_position;
 //Precisione desiderata
 double yaw_precision = M_PI / 90; // +/- 2 degrees precision
-float dist_precision = 0.3;
+float dist_precision = 0.8;
 //
-float sft_dist = 1.0; //Safety distance from the obstacle
+float sft_dist = 1.5; //safety distance from front, fleft, fright obstacles
+float sft_lat_dist = 0.5; //Safety distance from left and right obstacle
 double take_action_linear_speed = 0.4; 
 double take_action_angular_speed = 0.3;
 float min_regions[6] = {0};
@@ -38,7 +41,8 @@ float min_regions[6] = {0};
 typedef enum _ROBOT_STATE //Enum to classify the robot general state
 {
     TURN_LEFT= 0,
-    FOLLOW_WALL,
+    FOLLOW_WALL_RIGHT,
+    FOLLOW_WALL_LEFT,
     GO_TO_POINT,
     UNKNOW
 } ROBOT_STATE;
@@ -117,62 +121,76 @@ void decide_actions(float regions[], float sft_dist)
 	 *    |-right-/                        \-left-|
 	 *
 	 */
+    float right = regions[0];
 	float fright = regions[1];
 	float front  = regions[2];
 	float fleft  = regions[3];
+    float left = regions[4];
     int i;
 	//std_msgs::String state_description;
     
     if(change_state!=ARRIVED) //Continue to scan since you're not arrived
     {
-	if((fright > sft_dist) && (front > sft_dist) && (fleft > sft_dist))
+	if((fright > sft_dist) && (front > sft_dist) && (fleft > sft_dist)&& (left > sft_lat_dist) && (right > sft_lat_dist))
 	{
 		//state_description.data = "case 1 - nothing [Go to the point]";
         state = GO_TO_POINT;
         
 	}
+    else if((fright > sft_dist) && (front > sft_dist) && (fleft > sft_dist) && (left < sft_lat_dist))
+	{
+		//Estensione caso 1, necessaria per non passare troppo vicino a muri
+        state = FOLLOW_WALL_LEFT;
+        
+	}
+    else if((fright > sft_dist) && (front > sft_dist) && (fleft > sft_dist) && (right < sft_lat_dist))
+	{
+		//Estensione caso 1, necessaria per non passare troppo vicino a muri
+        state = FOLLOW_WALL_RIGHT;
+        
+	}
 	else if((fright > sft_dist) && (front > sft_dist) && (fleft < sft_dist))
 	{
-		//state_description.data = "case 2 - fleft [Go to the point]";
-        state = GO_TO_POINT;
+		
+        state = FOLLOW_WALL_LEFT; //But getting away from it
         
 	}
 	else if((fright > sft_dist) && (front < sft_dist) && (fleft > sft_dist))
 	{
-		//state_description.data = "case 3 - front [Turn left]";
+
         state = TURN_LEFT;
         
 	}
 	else if((fright > sft_dist) && (front < sft_dist) && (fleft < sft_dist))
 	{
-		//state_description.data = "case 4 - front and fleft [Turn left]";
+
         state = TURN_LEFT;
         
 	}
 	else if((fright < sft_dist) && (front > sft_dist) && (fleft > sft_dist))
 	{
-		//state_description.data = "case 5 - fright [Follow the wall]";
-        state = FOLLOW_WALL;
+	
+        state = FOLLOW_WALL_RIGHT; //But getting away from it
         
 
 	}
 	else if((fright < sft_dist) && (front > sft_dist) && (fleft < sft_dist))
 	{
-		//state_description.data = "case 6 - fright and fleft [Go to the point]";
-        state = GO_TO_POINT;
+		
+        state = TURN_LEFT;
         
 
 	}
 	else if((fright < sft_dist) && (front < sft_dist) && (fleft > sft_dist))
 	{
-		//state_description.data = "case 7 - fright and front [Follow the wall]";
+		
         state = TURN_LEFT;
         
 
 	}
 	else if((fright < sft_dist) && (front < sft_dist) && (fleft < sft_dist))	
 	{
-		//state_description.data = "case 8 - fright and front and fleft [Turn left]";
+		
         state = TURN_LEFT;
         
 
@@ -216,24 +234,45 @@ void robot_moving(ROBOT_STATE move_type)
             fix_yaw(desired_position);
         else if(change_state == STRAIGHT)
                 go_straight(desired_position);
+        motion_pub.publish(motion_command);
         
     }
     else if (move_type == TURN_LEFT)
     {
-
+        if(pos_err > dist_precision)
+        {
         ROS_INFO("Turning left!");
         motion_command.linear.x = 0.0;
         motion_command.angular.z = take_action_angular_speed;
         motion_pub.publish(motion_command);
+        }
+        else change_state = ARRIVED;
        
     }
-    else if (move_type == FOLLOW_WALL)
+    else if (move_type == FOLLOW_WALL_RIGHT)
     {
-
+        if(pos_err > dist_precision)
+        {
         ROS_INFO("Avoiding the obstacle!");
          motion_command.linear.x = take_action_linear_speed;
-          motion_command.angular.z = 0.0;
+          motion_command.angular.z = -0.3;
           motion_pub.publish(motion_command);
+        }
+        else change_state = ARRIVED;
+
+    }
+
+    else if (move_type == FOLLOW_WALL_LEFT)
+    {
+        if(pos_err > dist_precision)
+        {
+        ROS_INFO("Avoiding the obstacle!");
+         motion_command.linear.x = take_action_linear_speed;
+          motion_command.angular.z = 0.3;
+          motion_pub.publish(motion_command);
+        }
+        else change_state = ARRIVED;
+
     }
        
 
@@ -262,19 +301,19 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom_info)
      yaw_err = desired_yaw - yaw;
      if (std::abs(yaw_err) > yaw_precision)
         if( yaw_err > 0)
-            motion_command.angular.z = -take_action_angular_speed;
+            motion_command.angular.z = -0.4;
         else 
-            motion_command.angular.z = take_action_angular_speed; 
+            motion_command.angular.z = 0.4; 
     else if (std::abs(yaw_err) <= yaw_precision)
             change_state = STRAIGHT;
-     motion_pub.publish(motion_command);
+        
+     
  }
 
  void go_straight(const geometry_msgs::Point des_pos)
   { 
     double desired_yaw;
     double yaw_err;
-    double pos_err;
     desired_yaw = std::atan2(des_pos.y - position.y, des_pos.x - position.x);
     yaw_err = desired_yaw - yaw;
     pos_err = std::sqrt(std::pow(des_pos.y - position.y, 2) + std::pow(des_pos.x - position.x,2));
@@ -282,11 +321,13 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom_info)
     {
         motion_command.angular.z = 0;
         motion_command.linear.x = take_action_linear_speed;
-        motion_pub.publish(motion_command);
+        
     }
-    else change_state = ARRIVED;
+    else 
+        change_state = ARRIVED;
     if (std::abs(yaw_err) > yaw_precision)
         change_state = FIX_YAW;
+        
   }
 
 
@@ -294,7 +335,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& odom_info)
 int main(int argc, char **argv)
 {
     //ROS node initialization
-    ros::init(argc, argv, "reading_laser");
+    ros::init(argc, argv, "go_to_point");
     ros::NodeHandle n;
     //Subscribing to the laser topic to read laser messages
     sub = n.subscribe("/m2wr/laser/scan", 100, laserCallback);
